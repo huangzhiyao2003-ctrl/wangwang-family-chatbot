@@ -2,7 +2,7 @@ import React, { useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { ArrowLeft, Send, Sparkles, MessageCircle, Heart, PenLine, Bot, Coffee, UserRound } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { appCopy, getFreeTextReply, getInitialMessage, getReply, members, quickCards } from "./data/content.js";
+import { appCopy, getFreeTextReply, getInitialMessage, getReply, members, quickCards, recentStatus } from "./data/content.js";
 import "./style.css";
 
 const cardIcons = {
@@ -13,6 +13,43 @@ const cardIcons = {
   penLine: PenLine,
   sparkles: Sparkles
 };
+
+const apiErrorReply = "我这会儿有点卡住啦，你可以先把想说的话微信发给旺旺，写清楚重点就好。";
+
+async function requestChatReply(member, message) {
+  let response;
+
+  try {
+    response = await fetch("/api/chat", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json"
+      },
+      body: JSON.stringify({
+        member,
+        message,
+        recentStatus
+      })
+    });
+  } catch (error) {
+    error.useLocalFallback = true;
+    throw error;
+  }
+
+  const data = await response.json().catch(() => null);
+
+  if (data?.reply) {
+    return data.reply;
+  }
+
+  if (!response.ok) {
+    const error = new Error(data?.error || "chat request failed");
+    error.useLocalFallback = response.status === 404;
+    throw error;
+  }
+
+  return apiErrorReply;
+}
 
 function App() {
   const [member, setMember] = useState(null);
@@ -59,17 +96,25 @@ function App() {
     ]);
   };
 
-  const sendInput = () => {
+  const sendInput = async () => {
     if (!member) return;
     if (!input.trim()) return;
     const userText = input.trim();
-    const botText = getFreeTextReply(member, userText);
+    const loadingId = `loading-${Date.now()}-${Math.random().toString(16).slice(2)}`;
     setMessages((prev) => [
       ...prev,
       { role: "user", text: userText },
-      { role: "bot", text: botText }
+      { id: loadingId, role: "bot", text: "我想想怎么说更合适…" }
     ]);
     setInput("");
+
+    try {
+      const botText = await requestChatReply(member, userText);
+      setMessages((prev) => prev.map((msg) => (msg.id === loadingId ? { role: "bot", text: botText } : msg)));
+    } catch (error) {
+      const fallbackText = error.useLocalFallback ? getFreeTextReply(member, userText) : apiErrorReply;
+      setMessages((prev) => prev.map((msg) => (msg.id === loadingId ? { role: "bot", text: fallbackText } : msg)));
+    }
   };
 
   return (
@@ -161,7 +206,7 @@ function App() {
                 <AnimatePresence initial={false}>
                   {messages.map((msg, idx) => (
                     <motion.div
-                      key={`${msg.role}-${idx}`}
+                      key={msg.id || `${msg.role}-${idx}`}
                       initial={{ opacity: 0, y: 8 }}
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0 }}

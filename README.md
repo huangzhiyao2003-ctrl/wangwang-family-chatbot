@@ -1,6 +1,8 @@
 # 旺旺家庭聊天小助手
 
-一个 Vite + React 的本地规则版聊天页面，用来给家人解释旺旺近况。当前版本不接 API，构建后可直接静态部署。
+一个 Vite + React + Cloudflare Pages Functions 的聊天页面，用来给家人解释旺旺近况。
+
+快捷问题使用前端本地固定回复；输入框自由输入会请求 Cloudflare Pages Function `/api/chat`，由后端调用 DeepSeek。API Key 不会写进前端代码。
 
 ## 本地运行
 
@@ -33,3 +35,13 @@ dist
 ## 静态部署
 
 部署时使用 `dist` 目录作为静态站点目录即可。
+
+## Cloudflare 环境变量
+
+在 Cloudflare Pages 项目里设置环境变量：
+
+```bash
+DEEPSEEK_API_KEY
+```
+
+不要把真实 API Key 写进 `src` 或 README。
