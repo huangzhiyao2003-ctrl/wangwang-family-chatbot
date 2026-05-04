@@ -8,6 +8,7 @@ export const appCopy = {
   chatStatusSuffix: "聊天",
   identityLabel: "选择聊天身份",
   chatAreaLabel: "聊天内容",
+  presetToggle: "猜你想问什么",
   backLabel: "返回身份选择",
   sendLabel: "发送",
   inputPlaceholder: "问问旺旺最近怎么样..."
@@ -77,26 +78,25 @@ export const quickCards = [
     type: "general"
   },
   {
-    id: "wechat",
-    title: "帮我写一句微信给她",
-    chipLabel: "帮我写句微信",
-    icon: "penLine",
-    type: "general"
-  },
-  {
-    id: "reminder",
-    title: "我想提醒她一件事",
-    chipLabel: "我想提醒她",
-    icon: "heart",
-    type: "general"
-  },
-  {
     id: "poem",
     title: "帮爷爷润色打油诗",
     chipLabel: "帮爷爷改打油诗",
     icon: "penLine",
     type: "grandpa"
   }
+];
+
+export const presetQuestions = [
+  { id: "recent", question: "旺旺最近在忙什么？" },
+  { id: "state", question: "她现在状态还好吗？" },
+  { id: "work", question: "她工作到底是做什么的？" },
+  { id: "replySlow", question: "她为什么有时候不回消息？" },
+  { id: "missHer", question: "我想她了，可以怎么跟她说？" },
+  { id: "mealsSleep", question: "怎么提醒她吃饭睡觉？" },
+  { id: "urgent", question: "有急事应该怎么办？" },
+  { id: "tired", question: "她最近会不会太累？" },
+  { id: "wechatSoft", question: "我想给她发微信，怎么说不打扰？" },
+  { id: "care", question: "她忙的时候，我怎么关心她比较好？" }
 ];
 
 export function getInitialMessage(memberLabel) {
@@ -191,4 +191,44 @@ export function getFreeTextReply(memberId, text) {
 “旺旺，不急，你忙完看一下。我想跟你说：${text}。你方便的时候回我就行。”
 
 这样她看到的时候，不用猜半天，也更容易处理。`;
+}
+
+function getMemberNudge(memberId) {
+  const nudges = {
+    dad: "爸，你通勤也辛苦，关心她的时候顺手也照顾下自己，鼻炎不舒服就早点休息，麻将别打太晚。",
+    mom: "妈妈，你先放心，她不是不想回，多半是手头事情挤在一起了。",
+    grandma: "奶奶，你一直很聪明也很自律，会用这些新东西已经很厉害了，也记得照顾好自己。",
+    grandpa: "爷爷，你这份惦记很有分量，说出来也得有点风度，旺旺看了会懂的。"
+  };
+
+  return nudges[memberId] || "";
+}
+
+export function getPresetAnswer(memberId, presetId) {
+  const tone = memberTone[memberId];
+  const nudge = getMemberNudge(memberId);
+
+  const answers = {
+    recent: `${tone.prefix}，旺旺${recentStatus.workload}。她主要是在${recentStatus.mainWork}，就是帮别人把小红书上的内容和花出去的钱看明白。${recentStatus.reassure}。${nudge}`,
+
+    state: `${tone.prefix}，她现在不是出什么大事，就是忙起来容易累。${recentStatus.health}，饭和睡觉也需要有人温柔提醒一下。你关心她这件事，她肯定是知道的。`,
+
+    work: getReply(memberId, "work"),
+
+    replySlow: `${tone.prefix}，她有时候不回，不代表不想理家里人。${recentStatus.replyTime}，忙的时候脑子里事情多，消息就容易慢半拍。可以先给她留一句微信，不用连环催，她看到会找方便的时候处理。`,
+
+    missHer: `${tone.prefix}，可以说得软一点，不给她压力。比如：“旺旺，我有点想你啦，不急着回，忙完看到跟我说一声就好。” 这样像家里人的惦记，不像催作业。`,
+
+    mealsSleep: `${tone.prefix}，提醒她吃饭睡觉，短一点最有效。可以发：“旺旺，忙归忙，饭要吃，觉也要睡。不急着回，看到记一下就行。” 旺旺会担心你们，也会愿意被这样轻轻提醒。`,
+
+    urgent: `${tone.prefix}，真急事别只等旺旺回。先找身边能马上处理的人，同时给旺旺发一条重点清楚的微信：什么事、急到什么程度、希望她做什么。这样她看到时不用猜，能更快明白重点。`,
+
+    tired: `${tone.prefix}，她最近确实可能会累一点，但别先往坏处想。这个活儿不一定累身体，却挺费脑子，脑袋容易一直转。关心她可以轻一点，别把担心变成压力。`,
+
+    wechatSoft: `${tone.prefix}，可以这样发：“旺旺，不急，你忙完再看。我就是想问问你最近怎么样，有没有好好吃饭。看到不用立刻回，有空回我一句就行。” 这句话不催，也把关心说到了。`,
+
+    care: `${tone.prefix}，她忙的时候，最舒服的关心是短、软、不给压力。比如问一句吃饭没、睡得怎么样，再加一句“不急着回”。家里人的关心不用很长，她看到会懂。`
+  };
+
+  return answers[presetId] || getFreeTextReply(memberId, presetQuestions.find((item) => item.id === presetId)?.question || "");
 }

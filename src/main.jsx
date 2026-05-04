@@ -1,13 +1,12 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { ArrowLeft, Send, Sparkles, MessageCircle, Heart, PenLine, Coffee } from "lucide-react";
+import { ArrowLeft, ChevronDown, Send, Sparkles, MessageCircle, PenLine, Coffee } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { appCopy, getFreeTextReply, getInitialMessage, getReply, members, quickCards, recentStatus } from "./data/content.js";
+import { appCopy, getFreeTextReply, getInitialMessage, getPresetAnswer, getReply, members, presetQuestions, quickCards, recentStatus } from "./data/content.js";
 import "./style.css";
 
 const cardIcons = {
   coffee: Coffee,
-  heart: Heart,
   messageCircle: MessageCircle,
   penLine: PenLine,
   sparkles: Sparkles
@@ -16,6 +15,13 @@ const cardIcons = {
 const apiErrorReply = "我这会儿有点卡住啦，你可以先把想说的话微信发给旺旺，写清楚重点就好。";
 const tooLongReply = "这段有点长，可以分几句慢慢说～";
 const maxInputLength = 200;
+const loadingText = "我想想怎么说更合适…";
+
+function waitForLocalReply() {
+  return new Promise((resolve) => {
+    window.setTimeout(resolve, 900 + Math.floor(Math.random() * 500));
+  });
+}
 
 function Avatar({ large = false }) {
   const [imageFailed, setImageFailed] = useState(false);
@@ -66,6 +72,10 @@ function App() {
   const [member, setMember] = useState(null);
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
+  const [showPresets, setShowPresets] = useState(false);
+  const [isThinking, setIsThinking] = useState(false);
+  const chatAreaRef = useRef(null);
+  const thinkingRef = useRef(false);
 
   const selectedMember = members.find((item) => item.id === member);
 
@@ -78,10 +88,18 @@ function App() {
     });
   }, [member]);
 
+  useEffect(() => {
+    if (!chatAreaRef.current) return;
+    chatAreaRef.current.scrollTop = chatAreaRef.current.scrollHeight;
+  }, [messages, showPresets]);
+
   const startChat = (memberId) => {
     const target = members.find((item) => item.id === memberId);
     setMember(memberId);
     setInput("");
+    setShowPresets(false);
+    setIsThinking(false);
+    thinkingRef.current = false;
     setMessages([
       {
         role: "bot",
@@ -93,50 +111,73 @@ function App() {
   const backToHome = () => {
     setMember(null);
     setInput("");
+    setShowPresets(false);
+    setIsThinking(false);
+    thinkingRef.current = false;
     setMessages([]);
+  };
+
+  const sendWithLoading = async (userText, getBotText) => {
+    if (!member) return;
+    if (thinkingRef.current) return;
+    thinkingRef.current = true;
+    setIsThinking(true);
+    const loadingId = `loading-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+
+    setMessages((prev) => [
+      ...prev,
+      { role: "user", text: userText },
+      { id: loadingId, role: "bot", text: loadingText, status: "loading" }
+    ]);
+
+    try {
+      const botText = await getBotText();
+      setMessages((prev) => prev.map((msg) => (msg.id === loadingId ? { role: "bot", text: botText } : msg)));
+    } finally {
+      thinkingRef.current = false;
+      setIsThinking(false);
+    }
   };
 
   const sendCard = (card) => {
     if (!member) return;
-    const userText = card.title;
-    const botText = getReply(member, card.id, input);
-    setMessages((prev) => [
-      ...prev,
-      { role: "user", text: userText },
-      { role: "bot", text: botText }
-    ]);
+    sendWithLoading(card.title, async () => {
+      await waitForLocalReply();
+      return getReply(member, card.id, input);
+    });
+  };
+
+  const sendPreset = (preset) => {
+    if (!member) return;
+    setShowPresets(false);
+    sendWithLoading(preset.question, async () => {
+      await waitForLocalReply();
+      return getPresetAnswer(member, preset.id);
+    });
   };
 
   const sendInput = async () => {
     if (!member) return;
+    if (thinkingRef.current) return;
     if (!input.trim()) return;
     const userText = input.trim();
+    setInput("");
 
     if (Array.from(userText).length > maxInputLength) {
-      setMessages((prev) => [
-        ...prev,
-        { role: "user", text: userText },
-        { role: "bot", text: tooLongReply }
-      ]);
-      setInput("");
+      sendWithLoading(userText, async () => {
+        await waitForLocalReply();
+        return tooLongReply;
+      });
       return;
     }
 
-    const loadingId = `loading-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-    setMessages((prev) => [
-      ...prev,
-      { role: "user", text: userText },
-      { id: loadingId, role: "bot", text: "我想想怎么说更合适…" }
-    ]);
-    setInput("");
-
-    try {
-      const botText = await requestChatReply(member, userText);
-      setMessages((prev) => prev.map((msg) => (msg.id === loadingId ? { role: "bot", text: botText } : msg)));
-    } catch (error) {
-      const fallbackText = error.useLocalFallback ? getFreeTextReply(member, userText) : apiErrorReply;
-      setMessages((prev) => prev.map((msg) => (msg.id === loadingId ? { role: "bot", text: fallbackText } : msg)));
-    }
+    sendWithLoading(userText, async () => {
+      try {
+        return await requestChatReply(member, userText);
+      } catch (error) {
+        return error.useLocalFallback ? getFreeTextReply(member, userText) : apiErrorReply;
+      }
+    });
   };
 
   return (
@@ -163,9 +204,13 @@ function App() {
               </header>
 
               <section className="identityGrid" aria-label={appCopy.identityLabel}>
-                {members.map((item) => (
+                {members.map((item, index) => (
                   <motion.button
-                    whileTap={{ scale: 0.97 }}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.06 + index * 0.06, duration: 0.22 }}
+                    whileHover={{ y: -2 }}
+                    whileTap={{ scale: 0.98 }}
                     key={item.id}
                     className="identityButton"
                     onClick={() => startChat(item.id)}
@@ -206,9 +251,11 @@ function App() {
                   const Icon = cardIcons[card.icon];
                   return (
                     <motion.button
-                      whileTap={{ scale: 0.97 }}
+                      whileHover={{ y: -1 }}
+                      whileTap={{ scale: 0.98 }}
                       key={card.id}
                       className="quickCard"
+                      disabled={isThinking}
                       onClick={() => sendCard(card)}
                     >
                       <div className="iconBubble">
@@ -220,7 +267,7 @@ function App() {
                 })}
               </section>
 
-              <section className="chatArea" aria-label={appCopy.chatAreaLabel}>
+              <section className="chatArea" aria-label={appCopy.chatAreaLabel} ref={chatAreaRef}>
                 <AnimatePresence initial={false}>
                   {messages.map((msg, idx) => (
                     <motion.div
@@ -228,11 +275,43 @@ function App() {
                       initial={{ opacity: 0, y: 8 }}
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0 }}
-                      className={`bubble ${msg.role}`}
+                      className={`bubble ${msg.role} ${msg.status === "loading" ? "loading" : ""}`}
                     >
-                      {msg.text}
+                      <span>{msg.text}</span>
+                      {msg.status === "loading" && (
+                        <span className="typingDots" aria-hidden="true">
+                          <i />
+                          <i />
+                          <i />
+                        </span>
+                      )}
                     </motion.div>
                   ))}
+                </AnimatePresence>
+              </section>
+
+              <section className={`presetPanel ${showPresets ? "open" : ""}`}>
+                <button className="presetToggle" onClick={() => setShowPresets((value) => !value)} aria-expanded={showPresets} disabled={isThinking}>
+                  <span>{appCopy.presetToggle}</span>
+                  <ChevronDown size={18} />
+                </button>
+
+                <AnimatePresence initial={false}>
+                  {showPresets && (
+                    <motion.div
+                      className="presetList"
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: "auto", opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.18 }}
+                    >
+                      {presetQuestions.map((preset) => (
+                        <button key={preset.id} className="presetQuestion" onClick={() => sendPreset(preset)} disabled={isThinking}>
+                          {preset.question}
+                        </button>
+                      ))}
+                    </motion.div>
+                  )}
                 </AnimatePresence>
               </section>
 
@@ -247,7 +326,7 @@ function App() {
                     }
                   }}
                 />
-                <button onClick={sendInput} aria-label={appCopy.sendLabel}>
+                <button onClick={sendInput} aria-label={appCopy.sendLabel} disabled={isThinking}>
                   <Send size={18} />
                 </button>
               </footer>
