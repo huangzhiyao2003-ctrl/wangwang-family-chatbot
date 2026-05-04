@@ -115,11 +115,19 @@ input {
 .avatar {
   width: 54px;
   height: 54px;
+  overflow: hidden;
   border-radius: 50%;
   display: grid;
   place-items: center;
   background: linear-gradient(145deg, rgba(255, 255, 255, 0.9), rgba(255, 229, 212, 0.7));
   box-shadow: 0 12px 28px rgba(80, 76, 100, 0.12);
+}
+
+.avatarImage {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
 }
 
 .topBar h1 {

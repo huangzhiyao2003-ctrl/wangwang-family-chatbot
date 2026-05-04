@@ -1,12 +1,11 @@
 import React, { useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { ArrowLeft, Send, Sparkles, MessageCircle, Heart, PenLine, Bot, Coffee, UserRound } from "lucide-react";
+import { ArrowLeft, Send, Sparkles, MessageCircle, Heart, PenLine, Coffee } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { appCopy, getFreeTextReply, getInitialMessage, getReply, members, quickCards, recentStatus } from "./data/content.js";
 import "./style.css";
 
 const cardIcons = {
-  bot: Bot,
   coffee: Coffee,
   heart: Heart,
   messageCircle: MessageCircle,
@@ -15,6 +14,18 @@ const cardIcons = {
 };
 
 const apiErrorReply = "我这会儿有点卡住啦，你可以先把想说的话微信发给旺旺，写清楚重点就好。";
+const tooLongReply = "这段有点长，可以分几句慢慢说～";
+const maxInputLength = 200;
+
+function Avatar({ large = false }) {
+  const [imageFailed, setImageFailed] = useState(false);
+
+  return (
+    <div className={`avatar ${large ? "heroAvatar" : ""}`}>
+      {!imageFailed && <img className="avatarImage" src="/avatar-red.jpg" alt="" onError={() => setImageFailed(true)} />}
+    </div>
+  );
+}
 
 async function requestChatReply(member, message) {
   let response;
@@ -100,6 +111,17 @@ function App() {
     if (!member) return;
     if (!input.trim()) return;
     const userText = input.trim();
+
+    if (Array.from(userText).length > maxInputLength) {
+      setMessages((prev) => [
+        ...prev,
+        { role: "user", text: userText },
+        { role: "bot", text: tooLongReply }
+      ]);
+      setInput("");
+      return;
+    }
+
     const loadingId = `loading-${Date.now()}-${Math.random().toString(16).slice(2)}`;
     setMessages((prev) => [
       ...prev,
@@ -134,9 +156,7 @@ function App() {
               transition={{ duration: 0.22 }}
             >
               <header className="heroHeader">
-                <div className="avatar heroAvatar">
-                  <UserRound size={28} />
-                </div>
+                <Avatar large />
                 <p className="eyebrow">{appCopy.eyebrow}</p>
                 <h1>{appCopy.homeTitle}</h1>
                 <p>{appCopy.homeSubtitle}</p>
@@ -170,9 +190,7 @@ function App() {
                 <button className="backButton" onClick={backToHome} aria-label={appCopy.backLabel}>
                   <ArrowLeft size={20} />
                 </button>
-                <div className="avatar">
-                  <UserRound size={24} />
-                </div>
+                <Avatar />
                 <div>
                   <h1>{appCopy.chatTitle}</h1>
                   <p>

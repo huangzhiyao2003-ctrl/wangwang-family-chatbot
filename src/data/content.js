@@ -58,49 +58,42 @@ export const quickCards = [
   {
     id: "status",
     title: "旺旺最近在忙什么？",
-    chipLabel: "最近忙啥",
+    chipLabel: "最近在忙什么",
     icon: "sparkles",
     type: "general"
   },
   {
     id: "work",
     title: "她工作到底是做什么的？",
-    chipLabel: "工作是啥",
+    chipLabel: "工作是做什么的",
     icon: "coffee",
     type: "general"
   },
   {
     id: "reply",
     title: "她怎么还没回我？",
-    chipLabel: "怎么没回",
+    chipLabel: "她怎么还没回",
     icon: "messageCircle",
     type: "general"
   },
   {
     id: "wechat",
     title: "帮我写一句微信给她",
-    chipLabel: "写句微信",
+    chipLabel: "帮我写句微信",
     icon: "penLine",
     type: "general"
   },
   {
     id: "reminder",
     title: "我想提醒她一件事",
-    chipLabel: "提醒她",
+    chipLabel: "我想提醒她",
     icon: "heart",
     type: "general"
   },
   {
-    id: "doubao",
-    title: "帮我看看豆包说得靠谱吗",
-    chipLabel: "豆包靠谱吗",
-    icon: "bot",
-    type: "grandma"
-  },
-  {
     id: "poem",
     title: "帮爷爷润色打油诗",
-    chipLabel: "润色打油诗",
+    chipLabel: "帮爷爷改打油诗",
     icon: "penLine",
     type: "grandpa"
   }
